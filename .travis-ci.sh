@@ -1,4 +1,4 @@
-OPAM_DEPENDS="lwt cstruct quickcheck ounit pa_ounit"
+OPAM_DEPENDS="lwt cstruct quickcheck ounit pa_ounit core async"
 GITHUB_DEPENDS="ocaml-packet"
 
 case "$OCAML_VERSION,$OPAM_VERSION" in
@@ -34,6 +34,6 @@ for dep in ${GITHUB_DEPENDS}; do
          ocaml setup.ml -configure && make && make install)
 done
 
-ocaml setup.ml -configure --enable-tests --enable-quickcheck --enable-lwt
+ocaml setup.ml -configure --enable-tests --enable-quickcheck --enable-lwt --enable-async
 make
 make test

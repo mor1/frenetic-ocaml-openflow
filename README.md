@@ -14,11 +14,17 @@ support for OpenFlow 1.3.
 Building from Source
 --------------------
 
+If you want to write an async-based controller:
+
+    $ opam install openflow async
+
+This installs the `openflow.async` subpackage.
+
 If you want to write a lwt-based controller:
 
     $ opam install openflow lwt
 
-This installed the `openflow.lwt` subpackage.
+This installs the `openflow.lwt` subpackage.
 
 If you just want serialization support:
 
@@ -32,6 +38,6 @@ The `_oasis` file specifies all the dependencies. If you're hacking on the
 library, you should install the dependencies needed to build the main
 library, the sub-packages, and the test suite.
 
-    $ opam install ocamlfind cstruct quickcheck ounit pa_ounit lwt
-    $ ./configure --enable-tests --enable-quickcheck --enable-lwt
+    $ opam install ocamlfind cstruct quickcheck ounit pa_ounit lwt core async
+    $ ./configure --enable-tests --enable-quickcheck --enable-lwt --enable-async
 

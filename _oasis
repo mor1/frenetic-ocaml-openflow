@@ -18,13 +18,19 @@ Flag lwt
     Description: build the openflow.lwt library
     Default: False
 
+Flag async
+  Description: build the openflow.async library
+  Default: False
+
 Library openflow
   Path: lib
   BuildDepends:
     str,
     cstruct,
     cstruct.syntax,
-    packet
+    core,
+    packet,
+    threads
   InternalModules:
     Bits,
     Misc,
@@ -64,6 +70,22 @@ Library lwt
     OpenFlow0x04_Misc,
     Socket,
     SDN
+
+Library async_openflow
+  Build$:         flag(async)
+  Path:           async/
+  BuildDepends:   core,
+                  async,
+                  cstruct,
+                  cstruct.async,
+                  threads,
+                  openflow,
+                  packet,
+                  sexplib,
+                  sexplib.syntax                  
+  Findlibname:    async
+  Findlibparent:  openflow
+  Modules:        Async_OpenFlow0x01_Tcp
 
 Library quickcheck
     Findlibparent: openflow
