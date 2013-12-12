@@ -7,10 +7,8 @@ open Core.Std
 open Async.Std
 open OpenFlow0x01
 
-module OFMessage : sig
-  type t = (xid * Message.t)
-end
+module OF0x01Message : OFProtocol.OFMessage
 
 module Tcp : Typed_tcp.S
-  with module Client_message = OFMessage
-   and module Server_message = OFMessage
+  with type Client_message.t = OF0x01Message.t
+   and type Server_message.t = OF0x01Message.t

@@ -85,7 +85,9 @@ Library async_openflow
                   sexplib.syntax                  
   Findlibname:    async
   Findlibparent:  openflow
-  Modules:        Async_OpenFlow0x01_Tcp
+  Modules:
+    OFProtocol,
+    Async_OpenFlow0x01_Tcp
 
 Library quickcheck
     Findlibparent: openflow
