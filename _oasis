@@ -87,6 +87,7 @@ Library async_openflow
   Findlibparent:  openflow
   Modules:
     OFProtocol,
+    OFController,
     Async_OpenFlow0x01_Tcp
 
 Library quickcheck
