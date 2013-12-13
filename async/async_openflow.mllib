@@ -1,6 +1,7 @@
 # OASIS_START
-# DO NOT EDIT (digest: 8048f707c910413bf1531e9ecddd29fd)
+# DO NOT EDIT (digest: 826dca5460b95f2af484d5e0b929acb1)
 OFProtocol
 OFController
+OF0x01Controller
 Async_OpenFlow0x01_Tcp
 # OASIS_STOP

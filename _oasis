@@ -88,6 +88,7 @@ Library async_openflow
   Modules:
     OFProtocol,
     OFController,
+    OF0x01Controller,
     Async_OpenFlow0x01_Tcp
 
 Library quickcheck
