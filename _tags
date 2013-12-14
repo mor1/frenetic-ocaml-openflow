@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: b4682951f330262c1fa4cbb5b514a0c6)
+# DO NOT EDIT (digest: c9173119a4941d3b9cd116a52e2b9321)
 # Ignore VCS directories, you can use the same kind of rule outside 
 # OASIS_START/STOP if you want to exclude directories that contains 
 # useless stuff for the build process
@@ -37,8 +37,8 @@
 "async/async_openflow.cmxs": use_async_openflow
 <async/*.ml{,i}>: use_openflow
 <async/*.ml{,i}>: pkg_packet
-<async/*.ml{,i}>: pkg_core
 <async/*.ml{,i}>: pkg_async
+<async/*.ml{,i}>: pkg_core
 <async/*.ml{,i}>: pkg_cstruct
 <async/*.ml{,i}>: pkg_cstruct.async
 <async/*.ml{,i}>: pkg_threads
@@ -56,6 +56,31 @@
 <quickcheck/*.ml{,i}>: pkg_threads
 <quickcheck/*.ml{,i}>: pkg_str
 <quickcheck/*.ml{,i}>: pkg_cstruct.syntax
+# Executable learning_switch
+"examples/Learning_Switch.byte": use_async_openflow
+"examples/Learning_Switch.byte": use_openflow
+"examples/Learning_Switch.byte": pkg_packet
+"examples/Learning_Switch.byte": pkg_async
+"examples/Learning_Switch.byte": pkg_core
+"examples/Learning_Switch.byte": pkg_cstruct
+"examples/Learning_Switch.byte": pkg_cstruct.async
+"examples/Learning_Switch.byte": pkg_threads
+"examples/Learning_Switch.byte": pkg_sexplib
+"examples/Learning_Switch.byte": pkg_sexplib.syntax
+"examples/Learning_Switch.byte": pkg_str
+"examples/Learning_Switch.byte": pkg_cstruct.syntax
+<examples/*.ml{,i}>: use_async_openflow
+<examples/*.ml{,i}>: use_openflow
+<examples/*.ml{,i}>: pkg_packet
+<examples/*.ml{,i}>: pkg_async
+<examples/*.ml{,i}>: pkg_core
+<examples/*.ml{,i}>: pkg_cstruct
+<examples/*.ml{,i}>: pkg_cstruct.async
+<examples/*.ml{,i}>: pkg_threads
+<examples/*.ml{,i}>: pkg_sexplib
+<examples/*.ml{,i}>: pkg_sexplib.syntax
+<examples/*.ml{,i}>: pkg_str
+<examples/*.ml{,i}>: pkg_cstruct.syntax
 # Executable testtool
 "test/Test.byte": use_quickcheck
 "test/Test.byte": use_openflow
@@ -106,3 +131,4 @@
 <test/*.ml>: syntax_camlp4o
 <of13test/*.ml>: syntax_camlp4o
 <async/*.ml>: syntax_camlp4o
+<examples/*.ml>: syntax_camlp4o

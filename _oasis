@@ -118,6 +118,17 @@ Document doc
     OpenFlow0x04_Platform,
     OpenFlow0x04_Misc
 
+Executable learning_switch
+  Path: examples
+  Install: False
+  MainIs: Learning_Switch.ml
+  BuildDepends:
+    async,
+    core,
+    packet,
+    openflow,
+    openflow.async
+
 Executable testtool
   Path: test
   Install: False
