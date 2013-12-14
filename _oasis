@@ -28,9 +28,7 @@ Library openflow
     str,
     cstruct,
     cstruct.syntax,
-    core,
-    packet,
-    threads
+    packet
   InternalModules:
     Bits,
     Misc,
