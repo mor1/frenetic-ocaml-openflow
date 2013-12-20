@@ -7,10 +7,7 @@ open OpenFlow0x01.Message
 
 module ClientTable = OF0x01Controller.ClientTable
 
-module EthTable = Map.Make(struct
-  type t = Int64.t sexp_opaque with sexp
-  let compare = Pervasives.compare
-end)
+module EthTable = Map.Make(Int64)
 
 type switchTable = portId EthTable.t ClientTable.t
 
