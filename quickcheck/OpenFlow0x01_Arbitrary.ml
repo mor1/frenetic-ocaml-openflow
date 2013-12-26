@@ -37,6 +37,19 @@ let arbitrary_option arb =
       (1, ret_gen None);
       (3, arb >>= fun e -> ret_gen (Some e)) ]
 
+let arbitrary_32mask =
+  let open Gen in
+  (choose_int (1, 32)) >>= fun a ->
+    ret_gen (Int32.of_int a)
+
+let arbitrary_masked arb arb_mask =
+  let open OpenFlow0x01_Core in
+  let open Gen in
+  frequency [
+    (1, arb >>= fun v -> ret_gen {OpenFlow0x01_Core.m_value = v; m_mask = None});
+    (3, arb >>= fun v ->
+        arb_mask >>= fun m -> ret_gen {OpenFlow0x01_Core.m_value = v; m_mask = Some m}) ]
+
 module type OpenFlow0x01_Arbitrary = sig
 
     type t
@@ -139,8 +152,8 @@ module Match = struct
     arbitrary_option arbitrary_uint16 >>= fun dlTyp ->
     arbitrary_option arbitrary_dlVlan >>= fun dlVlan ->
     arbitrary_option arbitrary_dlVlanPcp >>= fun dlVlanPcp ->
-    arbitrary_option arbitrary_nwAddr >>= fun nwSrc ->
-    arbitrary_option arbitrary_nwAddr >>= fun nwDst ->
+    arbitrary_option (arbitrary_masked arbitrary_nwAddr arbitrary_32mask) >>= fun nwSrc ->
+    arbitrary_option (arbitrary_masked arbitrary_nwAddr arbitrary_32mask) >>= fun nwDst ->
     arbitrary_option arbitrary_uint8 >>= fun nwProto ->
     arbitrary_option arbitrary_nwTos >>= fun nwTos ->
     arbitrary_option arbitrary_tpPort >>= fun tpSrc ->
@@ -273,7 +286,7 @@ module FlowMod = struct
   end
 
   module Timeout = struct
-    type t = FlowMod.Timeout.t
+    type t = OpenFlow0x01.Timeout.t
     type s = Packet.int16
 
     let arbitrary =
@@ -284,10 +297,10 @@ module FlowMod = struct
         arbitrary_uint16 >>= (fun n -> ret_gen (ExpiresAfter n))
       ]
 
-    let to_string = FlowMod.Timeout.to_string
+    let to_string = OpenFlow0x01.Timeout.to_string
 
-    let marshal = FlowMod.Timeout.to_int
-    let parse = FlowMod.Timeout.of_int
+    let marshal = OpenFlow0x01.Timeout.to_int
+    let parse = OpenFlow0x01.Timeout.of_int
   end
 
   type t = FlowMod.t

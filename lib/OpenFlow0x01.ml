@@ -10,7 +10,7 @@ type portId = int16
 type queueId = int32
 type xid = int32
 
-let string_of_switchId = Int64.to_string
+let string_of_switchId = Printf.sprintf "0x%Lx"
 let string_of_portId = string_of_int
 let string_of_queueId =  Int32.to_string
 
@@ -131,6 +131,12 @@ module Match = struct
     | None -> true
     | Some _ -> false
 
+  let mask_bits x = match x with
+    | None -> 32 (* WildcardAll *)
+    | Some x -> match x.m_mask with
+                  | None -> 0 (* WildcardExact *)
+                  | Some m -> Int32.to_int m
+
   let wildcards_of_match (m : t) : Wildcards.t =
     { Wildcards.in_port = is_none m.inPort;
       Wildcards.dl_vlan = 
@@ -144,10 +150,8 @@ module Match = struct
       Wildcards.nw_proto = is_none m.nwProto;
       Wildcards.tp_src = is_none m.tpSrc;
       Wildcards.tp_dst = is_none m.tpDst;
-      (* Oversimplified, since we don't support IP prefixes *)
-      Wildcards.nw_src = if is_none m.nwSrc then 32 else 0x0;
-      (* Oversimplified, since we don't support IP prefixes *)
-      Wildcards.nw_dst = if is_none m.nwDst then 32 else 0x0;
+      Wildcards.nw_src = mask_bits m.nwSrc;
+      Wildcards.nw_dst = mask_bits m.nwDst;
       Wildcards.dl_vlan_pcp = is_none m.dlVlanPcp;
       Wildcards.nw_tos = is_none m.nwTos;
     }
@@ -160,8 +164,8 @@ module Match = struct
     | Some n -> n
     | None -> 0
 
-  let if_some32 x = match x with
-    | Some n -> n
+  let if_some32mask x = match x with
+    | Some x -> x.m_value
     | None -> 0l
 
   let if_word48 x = match x with
@@ -182,8 +186,8 @@ module Match = struct
     set_ofp_match_dl_type bits (if_some16 m.dlTyp);
     set_ofp_match_nw_tos bits (if_some8 m.nwTos);
     set_ofp_match_nw_proto bits (if_some8 m.nwProto);
-    set_ofp_match_nw_src bits (if_some32 m.nwSrc);
-    set_ofp_match_nw_dst bits (if_some32 m.nwDst);
+    set_ofp_match_nw_src bits (if_some32mask m.nwSrc);
+    set_ofp_match_nw_dst bits (if_some32mask m.nwDst);
     set_ofp_match_tp_src bits (if_some16 m.tpSrc);
     set_ofp_match_tp_dst bits (if_some16 m.tpDst);
     sizeof_ofp_match
@@ -228,13 +232,21 @@ module Match = struct
         if w.Wildcards.nw_src >= 32 then 
           None
         else
-          Some (get_ofp_match_nw_src bits);
+          if w.Wildcards.nw_src = 0 then
+            Some {m_value = (get_ofp_match_nw_src bits); m_mask = None}
+          else
+            Some {m_value = (get_ofp_match_nw_src bits);
+                   m_mask = Some (Int32.of_int w.Wildcards.nw_src)};
       nwDst =
         (* Oversimplified, since we don't support IP prefixes *)
         if w.Wildcards.nw_dst >= 32 then
           None
         else
-          Some (get_ofp_match_nw_dst bits);
+          if w.Wildcards.nw_dst = 0 then
+            Some {m_value = (get_ofp_match_nw_dst bits); m_mask = None}
+          else
+            Some {m_value = (get_ofp_match_nw_dst bits);
+                  m_mask = Some (Int32.of_int w.Wildcards.nw_dst)};
       nwProto =
         if w.Wildcards.nw_proto then
           None
@@ -269,6 +281,11 @@ module Match = struct
       | None -> None
       | Some a -> Some (sprintf "%s = %s" lbl (pr a))
 
+  let mask_pr (pr : 'a -> string) (pr2 : 'a -> string) (v : 'a mask) : string =
+    match v.m_mask with
+      | None -> sprintf "%s" (pr v.m_value)
+      | Some a -> sprintf "%s/%s" (pr v.m_value) (pr2 a)
+
   let to_string (x : t) : string =
     let all_fields =
       [ fld_str "dlSrc" string_of_mac x.dlSrc;
@@ -279,8 +296,8 @@ module Match = struct
           | Some None -> Some "dlVlan = none"
           | Some (Some vlan) -> fld_str "dlVlan" string_of_int (Some vlan));
         fld_str "dlVlanPcp" Packet.string_of_dlVlanPcp x.dlVlanPcp;
-        fld_str "nwSrc" Packet.string_of_nwAddr x.nwSrc;
-        fld_str "nwDst" Packet.string_of_nwAddr x.nwDst;
+        fld_str "nwSrc" (mask_pr Packet.string_of_nwAddr Int32.to_string) x.nwSrc;
+        fld_str "nwDst" (mask_pr Packet.string_of_nwAddr Int32.to_string) x.nwDst;
         fld_str "nwProto" Packet.string_of_nwProto x.nwProto;
         fld_str "nwTos" Packet.string_of_nwTos x.nwTos;
         fld_str "tpSrc" Packet.string_of_tpPort x.tpSrc;
@@ -584,6 +601,25 @@ module Action = struct
 
 end
 
+module Timeout = struct
+
+  type t = timeout
+
+  let to_string t = match t with
+    | Permanent -> "Permanent"
+    | ExpiresAfter n -> Printf.sprintf "ExpiresAfter %d" n
+
+  let size_of _ = 2
+
+  let to_int x = match x with
+    | Permanent -> 0
+    | ExpiresAfter w -> w
+
+  let of_int d =
+    if d = 0 then Permanent else ExpiresAfter d
+end
+
+
 module FlowMod = struct
 
   module Command = struct
@@ -627,25 +663,6 @@ module FlowMod = struct
 
   end
 
-  module Timeout = struct
-
-    type t = timeout
-
-    let to_string t = match t with
-      | Permanent -> "Permanent"
-      | ExpiresAfter n -> Printf.sprintf "ExpiresAfter %d" n
-
-    let size_of _ = 2
-
-    let to_int x = match x with
-      | Permanent -> 0
-      | ExpiresAfter w -> w
-
-    let of_int d = 
-      if d = 0 then Permanent else ExpiresAfter d
-
-  end
-
   type t = flowMod
 
   cstruct ofp_flow_mod {
@@ -659,7 +676,7 @@ module FlowMod = struct
     uint16_t flags
   } as big_endian
 
-  let to_string m = Printf.sprintf
+  let to_string (m:t) = Printf.sprintf
     "{ command = %s; match = %s; priority = %d; actions = %s; cookie = %Ld;\
        idle_timeout = %s; hard_timeout = %s; notify_when_removed = %B;\
        apply_to_packet = %s; out_port = %s; check_overlap = %B }"
@@ -675,7 +692,7 @@ module FlowMod = struct
     (Misc.string_of_option PseudoPort.to_string m.out_port)
     m.check_overlap
 
-  let size_of msg =
+  let size_of (msg:flowMod) =
     (Match.size_of msg.pattern)
     + sizeof_ofp_flow_mod
     + (Action.size_of_sequence msg.actions)
@@ -724,27 +741,27 @@ module FlowMod = struct
      else Some (make out_port 0));
       check_overlap = check_overlap_of_flags flags }
 
-  let marshal m bits =
-    let bits = Cstruct.shift bits (Match.marshal m.pattern bits) in
-    set_ofp_flow_mod_cookie bits (m.cookie);
-    set_ofp_flow_mod_command bits (Command.to_int m.command);
-    set_ofp_flow_mod_idle_timeout bits (Timeout.to_int m.idle_timeout);
-    set_ofp_flow_mod_hard_timeout bits (Timeout.to_int m.hard_timeout);
-    set_ofp_flow_mod_priority bits (m.priority);
+  let marshal (msg:flowMod) bits =
+    let bits = Cstruct.shift bits (Match.marshal msg.pattern bits) in
+    set_ofp_flow_mod_cookie bits (msg.cookie);
+    set_ofp_flow_mod_command bits (Command.to_int msg.command);
+    set_ofp_flow_mod_idle_timeout bits (Timeout.to_int msg.idle_timeout);
+    set_ofp_flow_mod_hard_timeout bits (Timeout.to_int msg.hard_timeout);
+    set_ofp_flow_mod_priority bits (msg.priority);
     set_ofp_flow_mod_buffer_id bits
-      (match m.apply_to_packet with
+      (match msg.apply_to_packet with
         | None -> -1l
         | Some bufId -> bufId);
-    set_ofp_flow_mod_out_port bits (PseudoPort.marshal_optional m.out_port);
+    set_ofp_flow_mod_out_port bits (PseudoPort.marshal_optional msg.out_port);
     set_ofp_flow_mod_flags bits
-      (flags_to_int m.check_overlap m.notify_when_removed);
+      (flags_to_int msg.check_overlap msg.notify_when_removed);
     let bits = Cstruct.shift bits sizeof_ofp_flow_mod in
     let _ = List.fold_left
       (fun bits act ->
         Cstruct.shift bits (Action.marshal act bits))
       bits
-      (Action.move_controller_last m.actions) in
-    size_of m
+      (Action.move_controller_last msg.actions) in
+    size_of msg
 
 end
 
@@ -849,6 +866,104 @@ module PacketIn = struct
     let out = Cstruct.shift out sizeof_ofp_packet_in in 
     let _ = Payload.marshal pi.input_payload out in 
     size_of pi
+end
+
+module FlowRemoved = struct
+
+  module Reason = struct
+
+    type t = flowRemovedReason
+
+    cenum ofp_flow_removed_reason {
+      IDLE_TIMEOUT = 0;
+      HARD_TIMEOUT = 1;
+      DELETE = 2
+    } as uint8_t
+
+    let of_int d = match int_to_ofp_flow_removed_reason d with
+      | Some IDLE_TIMEOUT -> IdleTimeout
+      | Some HARD_TIMEOUT -> HardTimeout
+      | Some DELETE -> Delete
+      | None -> raise (Unparsable (sprintf "bad reason in flow_removed (%d)" d))
+
+    let to_int r = match r with
+      | IdleTimeout -> ofp_flow_removed_reason_to_int IDLE_TIMEOUT
+      | HardTimeout -> ofp_flow_removed_reason_to_int HARD_TIMEOUT
+      | Delete -> ofp_flow_removed_reason_to_int DELETE
+
+    let to_string r = match r with
+      | IdleTimeout -> "IdleTimeout"
+      | HardTimeout -> "HardTimeout"
+      | Delete -> "Delete"
+
+    let size_of _ = 1
+
+  end
+
+  type t = flowRemoved
+
+  cstruct ofp_flow_removed {
+    uint64_t cookie;
+    uint16_t priority;
+    uint8_t reason;
+    uint8_t pad[1];
+    uint32_t duration_sec;
+    uint32_t duration_nsec;
+    uint16_t idle_timeout;
+    uint8_t pad2[2];
+    uint64_t packet_count;
+    uint64_t byte_count
+  } as big_endian
+
+  let parse bits =
+    let pattern = Match.parse bits in
+    let bits = Cstruct.shift bits (Match.size_of pattern) in
+    let pattern = Match.parse bits in
+    let cookie = get_ofp_flow_removed_cookie bits in
+    let priority = get_ofp_flow_removed_priority bits in
+    let reason = Reason.of_int (get_ofp_flow_removed_reason bits) in
+    let duration_sec = get_ofp_flow_removed_duration_sec bits in
+    let duration_nsec = get_ofp_flow_removed_duration_nsec bits in
+    let idle_timeout = Timeout.of_int (get_ofp_flow_removed_idle_timeout bits) in
+    let packet_count = get_ofp_flow_removed_packet_count bits in
+    let byte_count = get_ofp_flow_removed_byte_count bits in
+    { pattern = pattern
+    ; cookie = cookie
+    ; priority = priority
+    ; reason = reason
+    ; duration_sec = duration_sec
+    ; duration_nsec = duration_nsec
+    ; idle_timeout = idle_timeout
+    ; packet_count = packet_count
+    ; byte_count = byte_count }
+
+  let to_string msg = Printf.sprintf
+    "{ flow = %s; cookie  = %Ld; priority = %d; reason = %s; duration_sec = %ld;\
+       duration_nsec = %ld; idle_timeout = %s; packet_count = %Ld; byte_count = %Ld }"
+    (Match.to_string msg.pattern)
+    msg.cookie
+    msg.priority
+    (Reason.to_string msg.reason)
+    msg.duration_sec
+    msg.duration_nsec
+    (Timeout.to_string msg.idle_timeout)
+    msg.packet_count
+    msg.byte_count
+
+  let size_of _ =
+    sizeof_ofp_flow_removed
+
+  let marshal (msg:t) (bits:Cstruct.t) : int =
+    let bits = Cstruct.shift bits (Match.marshal msg.pattern bits) in
+    set_ofp_flow_removed_cookie bits (msg.cookie);
+    set_ofp_flow_removed_priority bits (msg.priority);
+    set_ofp_flow_removed_reason bits (Reason.to_int msg.reason);
+    set_ofp_flow_removed_duration_sec bits (msg.duration_sec);
+    set_ofp_flow_removed_duration_nsec bits (msg.duration_nsec);
+    set_ofp_flow_removed_idle_timeout bits (Timeout.to_int msg.idle_timeout);
+    set_ofp_flow_removed_packet_count bits (msg.packet_count);
+    set_ofp_flow_removed_byte_count bits (msg.byte_count);
+    size_of msg
 end
 
 module PacketOut = struct
@@ -2372,6 +2487,7 @@ module Message = struct
     | SwitchFeaturesReply of SwitchFeatures.t
     | FlowModMsg of FlowMod.t
     | PacketInMsg of PacketIn.t
+    | FlowRemovedMsg of FlowRemoved.t
     | PortStatusMsg of PortStatus.t
     | PacketOutMsg of PacketOut.t
     | BarrierRequest
@@ -2393,6 +2509,7 @@ module Message = struct
       | FEATURES_REQ -> SwitchFeaturesRequest
       | FEATURES_RESP -> SwitchFeaturesReply (SwitchFeatures.parse buf)
       | PACKET_IN -> PacketInMsg (PacketIn.parse buf)
+      | FLOW_REMOVED -> FlowRemovedMsg (FlowRemoved.parse buf)
       | PORT_STATUS -> PortStatusMsg (PortStatus.parse buf)
       | BARRIER_REQ -> BarrierRequest
       | BARRIER_RESP -> BarrierReply
@@ -2421,6 +2538,7 @@ module Message = struct
     | PacketOutMsg _ -> PACKET_OUT
     | PortStatusMsg _ -> PORT_STATUS
     | PacketInMsg _ -> PACKET_IN
+    | FlowRemovedMsg _ -> FLOW_REMOVED
     | BarrierRequest -> BARRIER_REQ
     | BarrierReply -> BARRIER_RESP
     | StatsRequestMsg _ -> STATS_REQ
@@ -2441,6 +2559,7 @@ module Message = struct
     | PacketOutMsg _ -> "PacketOut"
     | PortStatusMsg _ -> "PortStatus"
     | PacketInMsg _ -> "PacketIn"
+    | FlowRemovedMsg _ -> "FlowRemoved"
     | BarrierRequest -> "BarrierRequest"
     | BarrierReply -> "BarrierReply"
     | StatsRequestMsg _ -> "StatsRequest"
@@ -2465,6 +2584,7 @@ module Message = struct
     | BarrierReply -> 0
     | StatsRequestMsg msg -> StatsRequest.size_of msg
     | PacketInMsg msg -> PacketIn.size_of msg
+    | FlowRemovedMsg msg -> FlowRemoved.size_of msg
     | SetConfig msg -> SwitchConfig.size_of msg
     | ConfigRequestMsg -> 0
     | ConfigReplyMsg msg -> ConfigReply.size_of msg
@@ -2501,6 +2621,9 @@ module Message = struct
       () 
     | PacketInMsg msg -> 
       let _ = PacketIn.marshal msg out in 
+      ()
+    | FlowRemovedMsg msg ->
+      let _ = FlowRemoved.marshal msg out in
       ()
     | SetConfig msg -> 
       let _ = SwitchConfig.marshal msg out in 

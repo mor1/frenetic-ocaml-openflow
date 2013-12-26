@@ -15,6 +15,8 @@ open Packet
     specification.
 *)
 
+type 'a mask = { m_value : 'a; m_mask : 'a option }
+
 (** [switchId] is the type of switch identifiers received as part of
 [SwitchFeature] replies. *)
 type switchId = int64
@@ -38,8 +40,8 @@ type pattern =
     ; dlTyp : dlTyp option (** Ethernet frame type. *)
     ; dlVlan : dlVlan option (** Input VLAN id. *)
     ; dlVlanPcp : dlVlanPcp option (** Input VLAN priority. *)
-    ; nwSrc : nwAddr option (** IP source address. *)
-    ; nwDst : nwAddr option (** IP destination address. *)
+    ; nwSrc : nwAddr mask option (** IP source address. *)
+    ; nwDst : nwAddr mask option (** IP destination address. *)
     ; nwProto : nwProto option (** IP protocol. *)
     ; nwTos : nwTos option (** IP ToS. *)
     ; tpSrc : tpPort option (** TCP/UDP source port. *)
@@ -137,6 +139,25 @@ type packetIn =
     ; reason : packetInReason (** Reason packet is being sent. *)
     }
 
+type flowRemovedReason =
+  | IdleTimeout
+  | HardTimeout
+  | Delete
+
+(** A flow-removed message.  See Section 5.4.2 of the OpenFlow 1.0
+    specification. *)
+type flowRemoved =
+    { pattern : pattern;
+      cookie : int64;
+      priority : int16;
+      reason : flowRemovedReason;
+      duration_sec : int32;
+      duration_nsec : int32;
+      idle_timeout : timeout;
+      packet_count : int64;
+      byte_count : int64
+    }
+
 (** A send-packet message.  See Section 5.3.6 of the OpenFlow 1.0
     specification. *)
 type packetOut =
@@ -164,7 +185,7 @@ val match_all : pattern
     zero, etc. *)
 val add_flow : int16 -> pattern -> action list -> flowMod
 
-val delete_flow_strict : pattern -> pseudoPort option -> flowMod
+val delete_flow_strict : int16 -> pattern -> pseudoPort option -> flowMod
 
 val delete_all_flows : flowMod
 

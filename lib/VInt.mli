@@ -4,9 +4,13 @@ type t =
   | Int64 of Int64.t
   | Int48 of Int64.t
   | Int32 of Int32.t
+  | Int32m of Int32.t * Int32.t (* value, mask *)
   | Int16 of int
   | Int8 of int
   | Int4 of int
+
+(** [get_int v] raises [Invalid_argument] if [v] cannot be coerced to an [int] *)
+val get_int : t -> int
 
 (** [get_int64 v] raises [Invalid_argument] if [v] is not [Int64_ ] *)
 val get_int64 : t -> Int64.t
@@ -14,6 +18,8 @@ val get_int64 : t -> Int64.t
 val get_int48 : t -> Int64.t
 
 val get_int32 : t -> Int32.t
+
+val get_int32m : t -> Int32.t * Int32.t (* value, mask *)
 
 val get_int16 : t -> int
 

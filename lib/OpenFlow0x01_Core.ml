@@ -1,5 +1,7 @@
 open Packet
 
+type 'a mask = { m_value : 'a; m_mask : 'a option }
+
 type switchId = int64
 
 type portId = int16
@@ -14,8 +16,8 @@ type pattern =
     ; dlTyp : dlTyp option
     ; dlVlan : dlVlan option
     ; dlVlanPcp : dlVlanPcp option
-    ; nwSrc : nwAddr option
-    ; nwDst : nwAddr option
+    ; nwSrc : nwAddr mask option
+    ; nwDst : nwAddr mask option
     ; nwProto : nwProto option
     ; nwTos : nwTos option
     ; tpSrc : tpPort option
@@ -88,6 +90,23 @@ type packetOut =
     ; apply_actions : action list
     }
 
+type flowRemovedReason =
+  | IdleTimeout
+  | HardTimeout
+  | Delete
+
+type flowRemoved =
+    { pattern : pattern
+    ; cookie : int64
+    ; priority : int16
+    ; reason : flowRemovedReason
+    ; duration_sec : int32
+    ; duration_nsec : int32
+    ; idle_timeout : timeout
+    ; packet_count : int64
+    ; byte_count : int64
+    }
+
 let add_flow prio pat actions = 
   { command = AddFlow;
     pattern = pat;
@@ -102,10 +121,10 @@ let add_flow prio pat actions =
     check_overlap = false
   }
 
-let delete_flow_strict pat port =
+let delete_flow_strict prio pat port =
   { command = DeleteStrictFlow
   ; pattern = pat
-  ; priority = 0
+  ; priority = prio
   ; actions = []
   ; cookie = 0L
   ; idle_timeout = Permanent
